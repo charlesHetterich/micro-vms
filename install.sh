@@ -69,5 +69,6 @@ systemctl enable --now flintlockd       # started with the args above
 
 msg "Setup complete — flintlockd is listening on $GRPC_ADDR"
 
+# INSIDE OF VPM, CONFIGURE NETWORK
 # ip route add default via 172.30.0.1 dev eth1
 # resolvectl dns eth1 8.8.8.8 1.1.1.1
