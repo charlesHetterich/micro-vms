@@ -1,0 +1,8 @@
+#cloud-config
+hostname: bun-program
+runcmd:
+  - curl -fsSL https://bun.sh/install | bash
+  - echo 'export PATH=$PATH:/root/.bun/bin' >> /root/.bashrc
+  - /root/.bun/bin/bun init -y
+  - /root/.bun/bin/bun add chalk
+  - echo 'import chalk from "chalk"; console.log(chalk.red("Hello world!"));' > index.ts
