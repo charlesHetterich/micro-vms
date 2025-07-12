@@ -22,6 +22,9 @@ apt-get install -y containerd jq iproute2 iptables ca-certificates curl git
 curl -L \
   https://github.com/containerd/nerdctl/releases/download/v2.1.3/nerdctl-2.1.3-linux-amd64.tar.gz \
   | sudo tar -xz -C /usr/local/bin nerdctl
+# INSTEAD OF nerdctl:
+sudo apt-get install -y skopeo umoci
+
 
 
 systemctl enable --now containerd
