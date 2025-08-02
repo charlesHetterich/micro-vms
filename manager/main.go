@@ -3,16 +3,10 @@ package main
 import (
 	"fmt"
 	"manager/commands"
+	c "manager/constants"
 	"manager/utils"
 	"os"
-)
-
-const (
-	TMP         = "/tmp/micro-vms"
-	BIN         = "/root/micro-vms/bin"
-	kernelImage = BIN + "/kernel-unpacked/rootfs/vmlinux"
-	rootfsBase  = "/mnt/rootfs-base"
-	rootfsImg   = BIN + "/rootfs.ext4"
+	// fcSdk "github.com/firecracker-microvm/firecracker-go-sdk"
 )
 
 func main() {
@@ -21,7 +15,7 @@ func main() {
 		os.Exit(1)
 	}
 
-	app := commands.NewApp(utils.NewRecordKeeper(TMP + "/records.json"))
+	app := commands.NewApp(utils.NewRecordKeeper(c.TMP + "/records.json"))
 
 	cmd := os.Args[1]
 	switch cmd {
