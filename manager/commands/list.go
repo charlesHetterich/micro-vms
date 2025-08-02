@@ -2,15 +2,28 @@ package commands
 
 import (
 	"fmt"
+	"manager/utils"
+	"reflect"
 	"strconv"
+	"strings"
 )
+
+func header() string {
+	rt := reflect.TypeOf(utils.Record{}) // the struct type
+	headers := make([]string, rt.NumField())
+	for i := 0; i < rt.NumField(); i++ {
+		headers[i] = rt.Field(i).Name // "ID", "PID"
+	}
+	return strings.Join(headers, "\t")
+}
 
 func (a *App) List(ids []string) error {
 	records, err := a.Records.Get(ids)
 	if err != nil {
 		return fmt.Errorf("`list` command failed: %w", err)
 	}
-	fmt.Println("ID\tPID")
+
+	fmt.Println(header())
 	for _, r := range records {
 		pid := "-"
 		if r.PID > 0 {

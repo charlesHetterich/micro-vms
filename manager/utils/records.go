@@ -17,8 +17,8 @@ const (
 )
 
 type Record struct {
-	ID  string `json:"id"`            // 5..250
-	PID int    `json:"pid,omitempty"` // optional
+	ID  string `json:"id"`
+	PID int    `json:"pid"`
 }
 
 type RecordKeeper struct {
