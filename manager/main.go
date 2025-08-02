@@ -38,18 +38,3 @@ func main() {
 		os.Exit(1)
 	}
 }
-
-// func parseIDs(args []string) ([]int, error) {
-// 	if len(args) == 0 {
-// 		return []int{}, nil // empty => delete all
-// 	}
-// 	out := make([]int, 0, len(args))
-// 	for _, a := range args {
-// 		id, err := strconv.Atoi(a)
-// 		if err != nil {
-// 			return nil, fmt.Errorf("invalid id %q: %w", a, err)
-// 		}
-// 		out = append(out, id)
-// 	}
-// 	return out, nil
-// }
