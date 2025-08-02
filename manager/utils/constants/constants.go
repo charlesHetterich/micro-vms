@@ -1,4 +1,4 @@
-package constants
+package utils
 
 const (
 	TMP          = "/tmp/micro-vms"

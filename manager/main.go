@@ -3,8 +3,8 @@ package main
 import (
 	"fmt"
 	"manager/commands"
-	c "manager/constants"
 	"manager/utils"
+	c "manager/utils/constants"
 	"os"
 	// fcSdk "github.com/firecracker-microvm/firecracker-go-sdk"
 )

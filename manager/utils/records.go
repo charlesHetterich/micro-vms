@@ -102,29 +102,30 @@ func NewRecordKeeper(filePath string) *RecordKeeper {
 }
 
 // Add new record with given features
-func (rk *RecordKeeper) Add(pid int) error {
+// Returns the ID
+func (rk *RecordKeeper) Add(pid int) (string, error) {
 	// Load store from disk
 	rk.mu.Lock()
 	defer rk.mu.Unlock()
 	s, err := rk.loadStore()
 	if err != nil {
-		return err
+		return "", err
 	}
 
 	// Get new ID
 	id, err := nextAvailableID(s)
 	if err != nil {
-		return err
+		return "", err
 	}
 
 	// Add record to store, save & return
 	rec := Record{ID: id, PID: pid}
 	s[id] = rec
-	return rk.save(s)
+	return id, rk.save(s)
 }
 
 // Remove deletes the given IDs; if ids is empty, removes ALL.
-func (rk *RecordKeeper) Remove(ids []string) (err error) {
+func (rk *RecordKeeper) Remove(ids []string) error {
 	// Lock & load store
 	rk.mu.Lock()
 	defer rk.mu.Unlock()
