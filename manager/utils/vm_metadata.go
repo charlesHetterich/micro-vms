@@ -10,7 +10,7 @@ import (
 type VMMetaData string
 
 func (m VMMetaData) TapName() string {
-	return c.BIN + "/tap" + string(m)
+	return "tap" + string(m)
 }
 
 func (m VMMetaData) SocketPth() string {
