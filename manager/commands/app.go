@@ -1,8 +1,6 @@
 package commands
 
-import (
-	"manager/utils"
-)
+import "manager/utils"
 
 type App struct {
 	Records *utils.RecordKeeper

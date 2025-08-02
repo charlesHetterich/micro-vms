@@ -1,14 +1,20 @@
 package commands
 
 import (
-	"math/rand"
-	"time"
+	"fmt"
+	"manager/utils"
 )
 
-var rng = rand.New(rand.NewSource(time.Now().UnixNano()))
+func (a *App) Launch() error {
+	id, err := a.Records.Add(-1)
+	if err != nil {
+		return fmt.Errorf("`launch` command failed: %v", err)
+	}
+	meta := utils.VMMetaData(id)
+	fmt.Println(meta.IP())
+	fmt.Println(meta.MacAddress())
+	fmt.Println(meta.SocketPth())
+	fmt.Println(meta.TapName())
 
-func (a *App) Launch() {
-	const min, max = 1000, 65535
-	pid := rng.Intn(max-min+1) + min
-	a.Records.Add(pid)
+	return nil
 }
