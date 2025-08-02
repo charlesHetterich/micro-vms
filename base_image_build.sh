@@ -1,7 +1,6 @@
 #!/bin/sh
-set -euo pipefail
 
-VM_IP="172.30.0.13"
+VM_IP="172.30.0.14"
 SSH_KEY="$HOME/.ssh/id_ed25519"
 
 # Launch raw vm

@@ -43,6 +43,7 @@ echo tun | tee /etc/modules-load.d/tun.conf >/dev/null
 # make bridge public
 sudo iptables -I FORWARD 1 -i lmbr0 -o eth0 -j ACCEPT
 sudo iptables -I FORWARD 1 -i eth0  -o lmbr0 -m state --state RELATED,ESTABLISHED -j ACCEPT
+sudo iptables -t nat -A POSTROUTING -s 172.30.0.0/24 -o eth0 -j MASQUERADE # necessary ??
 # something about making the connection perminent
 sudo apt-get install -y iptables-persistent
 sudo sh -c 'iptables-save > /etc/iptables/rules.v4'

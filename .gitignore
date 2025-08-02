@@ -1,3 +1,9 @@
-fc-demo
+fc-manager/fc-manager
 go.mod
 go.sum
+
+bin
+*.log
+*.metrics
+*.mem
+*.tar
