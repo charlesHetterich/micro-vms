@@ -9,10 +9,10 @@ import (
 )
 
 func header() string {
-	rt := reflect.TypeOf(utils.Record{}) // the struct type
+	rt := reflect.TypeOf(utils.Record{})
 	headers := make([]string, rt.NumField())
 	for i := 0; i < rt.NumField(); i++ {
-		headers[i] = rt.Field(i).Name // "ID", "PID"
+		headers[i] = rt.Field(i).Name
 	}
 	return strings.Join(headers, "\t")
 }

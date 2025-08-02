@@ -6,7 +6,6 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
-	"sort"
 	"strconv"
 	"sync"
 )
@@ -16,20 +15,22 @@ const (
 	maxID = 250
 )
 
+// Micro VM record.
 type Record struct {
 	ID  string `json:"id"`
 	PID int    `json:"pid"`
 }
 
+// Handles management of micro-vm records stored to disk
 type RecordKeeper struct {
 	filePath string
 	mu       sync.Mutex
 }
 
-func NewRecordKeeper(filePath string) *RecordKeeper {
-	return &RecordKeeper{filePath: filePath}
-}
+// Structure of `RecordKeeper`'s data blob
+type store = map[string]Record
 
+// Provide 0 padding for record IDs
 func padID(id string) string {
 	if len(id) < 3 {
 		return fmt.Sprintf("%03s", id)
@@ -37,35 +38,18 @@ func padID(id string) string {
 	return id
 }
 
-func validateID(id string) error {
-	idInt, err := strconv.Atoi(id)
-	if err != nil {
-		return fmt.Errorf("invalid id %q: %w", id, err)
-	}
-	if idInt < minID || idInt > maxID {
-		return fmt.Errorf("id %d out of range [%d,%d]", idInt, minID, maxID)
-	}
-	return nil
-}
-
-func (rk *RecordKeeper) ensureFile() error {
-	dir := filepath.Dir(rk.filePath)
-	if err := os.MkdirAll(dir, 0o755); err != nil {
-		return err
-	}
-	// If file doesn’t exist, create an empty JSON object.
+// Load store from file
+func (rk *RecordKeeper) loadStore() (store, error) {
+	// Create store if it does not exist
 	if _, err := os.Stat(rk.filePath); errors.Is(err, os.ErrNotExist) {
-		return os.WriteFile(rk.filePath, []byte("{}\n"), 0o644)
+		dir := filepath.Dir(rk.filePath)
+		if err := os.MkdirAll(dir, 0o755); err != nil {
+			return nil, err
+		}
+		return nil, os.WriteFile(rk.filePath, []byte("{}\n"), 0o644)
 	}
-	return nil
-}
 
-type store = map[string]Record
-
-func (rk *RecordKeeper) load() (store, error) {
-	if err := rk.ensureFile(); err != nil {
-		return nil, err
-	}
+	// Read raw store blob
 	raw, err := os.ReadFile(rk.filePath)
 	if err != nil {
 		return nil, err
@@ -73,6 +57,8 @@ func (rk *RecordKeeper) load() (store, error) {
 	if len(raw) == 0 {
 		return store{}, nil
 	}
+
+	// Parse store & return
 	var s store
 	if err := json.Unmarshal(raw, &s); err != nil {
 		return nil, fmt.Errorf("parse %s: %w", rk.filePath, err)
@@ -83,6 +69,8 @@ func (rk *RecordKeeper) load() (store, error) {
 	return s, nil
 }
 
+// Save store to file
+// (writes to tmp and then overwrite true file to avoid corruption)
 func (rk *RecordKeeper) save(s store) error {
 	tmp := rk.filePath + ".tmp"
 	data, err := json.MarshalIndent(s, "", "  ")
@@ -92,11 +80,13 @@ func (rk *RecordKeeper) save(s store) error {
 	if err := os.WriteFile(tmp, append(data, '\n'), 0o644); err != nil {
 		return err
 	}
-	// Atomic on POSIX: replaces the old file in one step.
 	return os.Rename(tmp, rk.filePath)
 }
 
-// nextAvailableID finds the lowest unused ID in [minID, maxID].
+// Finds available ID for a next record to use. IDs are
+//  1. unique,
+//  2. in range [5, 250]
+//  3. padded to 3 digits
 func nextAvailableID(s store) (string, error) {
 	for idRaw := minID; idRaw <= maxID; idRaw++ {
 		id := strconv.Itoa(idRaw)
@@ -107,54 +97,48 @@ func nextAvailableID(s store) (string, error) {
 	return "", errors.New("no available IDs")
 }
 
-// Add creates a new record with the lowest available ID and the provided features.
-// Currently the only feature is PID (optional). Returns the created Record.
-func (rk *RecordKeeper) Add(pid int) (Record, error) {
-	rk.mu.Lock()
-	defer rk.mu.Unlock()
-
-	s, err := rk.load()
-	if err != nil {
-		return Record{}, err
-	}
-
-	id, err := nextAvailableID(s)
-	if err != nil {
-		return Record{}, err
-	}
-	if err := validateID(id); err != nil {
-		return Record{}, err
-	}
-
-	rec := Record{ID: id, PID: pid}
-	s[id] = rec
-
-	if err := rk.save(s); err != nil {
-		return Record{}, err
-	}
-	return rec, nil
+func NewRecordKeeper(filePath string) *RecordKeeper {
+	return &RecordKeeper{filePath: filePath}
 }
 
-// Remove deletes the given IDs; if ids is empty, removes ALL.
-func (rk *RecordKeeper) Remove(ids []string) (err error) {
+// Add new record with given features
+func (rk *RecordKeeper) Add(pid int) error {
+	// Load store from disk
 	rk.mu.Lock()
 	defer rk.mu.Unlock()
-
-	s, err := rk.load()
+	s, err := rk.loadStore()
 	if err != nil {
 		return err
 	}
 
-	if len(ids) == 0 {
-		s = store{}
-		return rk.save(s)
+	// Get new ID
+	id, err := nextAvailableID(s)
+	if err != nil {
+		return err
 	}
 
-	for _, id := range ids {
-		if err := validateID(id); err != nil {
-			return err
-		}
-		delete(s, id)
+	// Add record to store, save & return
+	rec := Record{ID: id, PID: pid}
+	s[id] = rec
+	return rk.save(s)
+}
+
+// Remove deletes the given IDs; if ids is empty, removes ALL.
+func (rk *RecordKeeper) Remove(ids []string) (err error) {
+	// Lock & load store
+	rk.mu.Lock()
+	defer rk.mu.Unlock()
+	s, err := rk.loadStore()
+	if err != nil {
+		return err
+	}
+
+	// Delete records from store, save & return
+	if len(ids) == 0 { // delete all records
+		s = store{}
+	}
+	for _, id := range ids { // delete specific records
+		delete(s, padID(id))
 	}
 	return rk.save(s)
 }
@@ -162,34 +146,24 @@ func (rk *RecordKeeper) Remove(ids []string) (err error) {
 // Get returns records for the given IDs in the same order.
 // If ids is empty, returns all records sorted by ID ascending.
 func (rk *RecordKeeper) Get(ids []string) ([]Record, error) {
+	// Lock & load store
 	rk.mu.Lock()
 	defer rk.mu.Unlock()
-	s, err := rk.load()
+	s, err := rk.loadStore()
 	if err != nil {
 		return nil, err
 	}
 
-	if len(ids) == 0 {
-		// all, sorted by numeric ID
-		keys := make([]string, 0, len(s))
-		for k := range s {
-			keys = append(keys, k)
-		}
-		sort.Strings(keys)
-		out := make([]Record, 0, len(keys))
-		for _, k := range keys {
-			out = append(out, s[k])
+	// Fetch IDs from store as list & return
+	var out []Record
+	if len(ids) == 0 { // fetch all records
+		for _, v := range s {
+			out = append(out, v)
 		}
 		return out, nil
 	}
-
-	out := make([]Record, 0, len(ids))
-	for _, id := range ids {
-		id = padID(id) // ensure ID is padded
-		if err := validateID(id); err != nil {
-			return nil, err
-		}
-		if rec, ok := s[id]; ok {
+	for _, id := range ids { // fetch specific records
+		if rec, ok := s[padID(id)]; ok {
 			out = append(out, rec)
 		}
 	}
