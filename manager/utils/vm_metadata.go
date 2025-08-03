@@ -18,7 +18,11 @@ func (m VMMetaData) SocketPth() string {
 }
 
 func (m VMMetaData) IP() string {
-	return "172.30.0." + string(m)
+	idNum, err := strconv.Atoi(string(m))
+	if err != nil {
+		panic("invalid vmId: " + string(m))
+	}
+	return "172.30.0." + strconv.Itoa(idNum)
 }
 
 func (m VMMetaData) MacAddress() string {

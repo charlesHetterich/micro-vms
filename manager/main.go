@@ -11,7 +11,7 @@ import (
 
 func main() {
 	if len(os.Args) < 2 {
-		fmt.Println("Usage: ./fc-manager <launch|snap|launch_snap>")
+		fmt.Println("Usage: ./manager <launch|snap|launch_snap>")
 		os.Exit(1)
 	}
 
@@ -22,7 +22,11 @@ func main() {
 	case "launch":
 		app.Launch()
 	case "connect":
-		fmt.Println("TODO! Implement `connect`")
+		if len(os.Args) != 3 {
+			fmt.Println("Usage: ./manager connect <id>")
+			os.Exit(1)
+		}
+		app.Connect(os.Args[2])
 	case "list":
 		app.List(os.Args[2:])
 	case "delete":
