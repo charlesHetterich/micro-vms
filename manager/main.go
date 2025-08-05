@@ -3,6 +3,7 @@ package main
 import (
 	"fmt"
 	"manager/commands"
+	"manager/scripts"
 	"manager/utils"
 	c "manager/utils/constants"
 	"os"
@@ -31,6 +32,8 @@ func main() {
 		app.List(os.Args[2:])
 	case "delete":
 		app.Delete(os.Args[2:])
+	case "init":
+		scripts.Run("pullRO")
 	default:
 		fmt.Println("Unknown command:", cmd)
 		os.Exit(1)

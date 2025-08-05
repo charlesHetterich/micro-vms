@@ -11,9 +11,13 @@ import (
 //go:embed connect.sh
 var connectSh []byte
 
+//go:embed pull-root-overlay.sh
+var pullRO []byte
+
 // Maps script names -> embedded script blobs
 var registry = map[string][]byte{
 	"connect": connectSh,
+	"pullRO":  pullRO,
 }
 
 // Execute script from registry with provided arguments
