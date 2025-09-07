@@ -1,4 +1,5 @@
 # micro-vms
+The primary project is the cli tool in `manager`. Run a command with `go run . <cmd>`.
 
 ## When Closing
 - Delete Record from `VMIds`
