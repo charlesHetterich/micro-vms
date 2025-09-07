@@ -124,6 +124,24 @@ func (rk *RecordKeeper) Add(pid int) (string, error) {
 	return id, rk.save(s)
 }
 
+func (rk *RecordKeeper) Update(id string, pid int) error {
+	// Lock & load store
+	rk.mu.Lock()
+	defer rk.mu.Unlock()
+	s, err := rk.loadStore()
+	if err != nil {
+		return err
+	}
+
+	// Update record in store, save & return
+	if rec, ok := s[padID(id)]; ok {
+		rec.PID = pid
+		s[padID(id)] = rec
+		return rk.save(s)
+	}
+	return fmt.Errorf("record not found: %s", id)
+}
+
 // Remove deletes the given IDs; if ids is empty, removes ALL.
 func (rk *RecordKeeper) Remove(ids []string) error {
 	// Lock & load store
