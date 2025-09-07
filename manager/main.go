@@ -3,7 +3,6 @@ package main
 import (
 	"fmt"
 	"manager/commands"
-	"manager/scripts"
 	"manager/utils"
 	c "manager/utils/constants"
 	"os"
@@ -27,13 +26,26 @@ func main() {
 			fmt.Println("Usage: ./manager connect <id>")
 			os.Exit(1)
 		}
-		app.Connect(os.Args[2])
+		if err := app.Connect(os.Args[2]); err != nil {
+			fmt.Println("Error:", err)
+			os.Exit(1)
+		}
 	case "list":
-		app.List(os.Args[2:])
+		if err := app.List(os.Args[2:]); err != nil {
+			fmt.Println("Error:", err)
+			os.Exit(1)
+		}
 	case "delete":
-		app.Delete(os.Args[2:])
+		if err := app.Delete(os.Args[2:]); err != nil {
+			fmt.Println("Error:", err)
+			os.Exit(1)
+		}
 	case "init":
-		scripts.Run("pullRO")
+		if err := app.Init(); err != nil {
+			fmt.Println("Error:", err)
+			os.Exit(1)
+		}
+
 	default:
 		fmt.Println("Unknown command:", cmd)
 		os.Exit(1)

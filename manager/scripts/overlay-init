@@ -18,7 +18,7 @@
 # 1. rw_root -- path where the read/write root is mounted
 # 2. work_dir -- path to the overlay workdir (must be on same filesystem as rw_root)
 # Overlay will be set up on /mnt, original root on /mnt/rom
-sleep 20
+
 pivot() {
     local rw_root work_dir
     rw_root="$1"
@@ -57,6 +57,8 @@ if [ -n "$overlay_root" ] &&
     echo "Overlay root given as $overlay_root but /dev/$overlay_root does not exist"
     exit 1
 fi
+
+mkdir -p /WEDIDIT
 
 do_overlay
 

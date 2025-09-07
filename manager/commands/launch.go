@@ -26,11 +26,19 @@ func (a *App) Launch() error {
 		fmt.Fprintf(os.Stderr, "Failed to open tap device: %v\n", err)
 		return err
 	}
-	_, guestNet, _ := net.ParseCIDR(meta.IP() + "/24")
+	fmt.Printf("VM IP: %s\n", meta.IP())
+	ip := net.ParseIP(meta.IP()) // e.g. "172.30.0.7"
+	mask := net.CIDRMask(24, 32)
+
+	// _, guestNet, _ := net.ParseCIDR(meta.IP() + "/24")
+	fmt.Printf("VM IP: %s\n", net.IPNet{IP: ip, Mask: mask})
+
 	cfg := fcSdk.Config{
 		SocketPath:      meta.SocketPth(),
 		KernelImagePath: c.KERNEL_IMAGE,
-		KernelArgs:      "console=ttyS0 reboot=k panic=1 pci=off overlay_root=ram init=/sbin/overlay-init overlay_id=" + id,
+		// KernelArgs:      "console=ttyS0 reboot=k panic=1 pci=off overlay_root=ram init=/sbin/overlay-init overlay_id=" + id,
+		// KernelArgs: "console=ttyS0 reboot=k panic=1 pci=off init=/sbin/init",
+		KernelArgs: "console=ttyS0 reboot=k panic=1 pci=off root=/dev/vda rw init=/sbin/init",
 		Drives: []models.Drive{
 			{
 				DriveID:      fcSdk.String("rootfs"),
@@ -56,7 +64,7 @@ func (a *App) Launch() error {
 					MacAddress:  meta.MacAddress(),
 					HostDevName: meta.TapName(),
 					IPConfiguration: &fcSdk.IPConfiguration{
-						IPAddr:  *guestNet,
+						IPAddr:  net.IPNet{IP: ip, Mask: mask},
 						Gateway: net.ParseIP("172.30.0.1"),
 						IfName:  "eth0",
 					},
@@ -71,7 +79,13 @@ func (a *App) Launch() error {
 	logger := logrus.New()
 	entry := logrus.NewEntry(logger)
 	ctx := context.Background()
-	cmd := fcSdk.VMCommandBuilder{}.WithSocketPath(meta.SocketPth()).Build(ctx)
+	cmd := fcSdk.VMCommandBuilder{}.
+		WithSocketPath(meta.SocketPth()).
+		WithStdout(os.Stdout).
+		WithStderr(os.Stderr).
+		WithStdin(os.Stdin).
+		Build(ctx)
+	// cmd := fcSdk.VMCommandBuilder{}.WithSocketPath(meta.SocketPth()).Build(ctx)
 
 	machine, err := fcSdk.NewMachine(
 		ctx, cfg,
@@ -84,8 +98,15 @@ func (a *App) Launch() error {
 	if err := machine.Start(ctx); err != nil {
 		panic(err)
 	}
-	pid, _ := machine.PID()
-	a.Records.Update(id, pid)
+	// pid, _ := machine.PID()
+	pid, err := machine.PID()
+	if err != nil {
+		return fmt.Errorf("get PID: %w", err)
+	}
+
+	if err := a.Records.Update(id, pid); err != nil {
+		return fmt.Errorf("record PID: %w", err)
+	}
 
 	return nil
 }

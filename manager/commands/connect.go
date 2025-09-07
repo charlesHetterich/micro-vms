@@ -2,14 +2,24 @@ package commands
 
 import (
 	"fmt"
-	"manager/scripts"
 	"manager/utils"
+	"os"
+	"os/exec"
 )
 
 func (a *App) Connect(id string) error {
-	err := scripts.Run("connect", utils.VMMetaData(id).IP())
-	if err != nil {
-		return fmt.Errorf("failed to run connect script: %w", err)
+	cmd := exec.Command("ssh",
+		"-tt",
+		"-o", "StrictHostKeyChecking=no",
+		"-i", os.Getenv("HOME")+"/.ssh/id_ed25519",
+		"root@"+utils.VMMetaData(id).IP(),
+	)
+
+	cmd.Stdin = os.Stdin
+	cmd.Stdout = os.Stdout
+	cmd.Stderr = os.Stderr
+	if err := cmd.Run(); err != nil {
+		return fmt.Errorf("ssh: %w", err)
 	}
 	return nil
 }
