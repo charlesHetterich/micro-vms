@@ -7,6 +7,7 @@ import (
 	"net"
 	"os"
 	"os/exec"
+	"path/filepath"
 
 	c "manager/utils/constants"
 
@@ -33,25 +34,31 @@ func (a *App) Launch() error {
 	// _, guestNet, _ := net.ParseCIDR(meta.IP() + "/24")
 	fmt.Printf("VM IP: %s\n", net.IPNet{IP: ip, Mask: mask})
 
+	overlay, err := SetupOverlayWithNetplan(id)
+	if err != nil {
+		return err
+	}
+
 	cfg := fcSdk.Config{
 		SocketPath:      meta.SocketPth(),
 		KernelImagePath: c.KERNEL_IMAGE,
-		// KernelArgs:      "console=ttyS0 reboot=k panic=1 pci=off overlay_root=ram init=/sbin/overlay-init overlay_id=" + id,
+		KernelArgs:      "console=ttyS0 reboot=k panic=1 pci=off root=/dev/vda ro overlay_root=vdb init=/sbin/overlay-init overlay_id=" + id,
+		// KernelArgs: "console=ttyS0 reboot=k panic=1 pci=off overlay_root=ram init=/sbin/init overlay_id=" + id,
 		// KernelArgs: "console=ttyS0 reboot=k panic=1 pci=off init=/sbin/init",
-		KernelArgs: "console=ttyS0 reboot=k panic=1 pci=off root=/dev/vda rw init=/sbin/init",
+		// KernelArgs: "console=ttyS0 reboot=k panic=1 pci=off root=/dev/vda rw init=/sbin/init",
 		Drives: []models.Drive{
 			{
 				DriveID:      fcSdk.String("rootfs"),
 				PathOnHost:   fcSdk.String(c.ROOTFS_IMG),
 				IsRootDevice: fcSdk.Bool(true),
+				IsReadOnly:   fcSdk.Bool(true),
+			},
+			{
+				DriveID:      fcSdk.String("overlayfs"),
+				PathOnHost:   fcSdk.String(overlay),
+				IsRootDevice: fcSdk.Bool(false),
 				IsReadOnly:   fcSdk.Bool(false),
 			},
-			// {
-			// 	DriveID:      fcSdk.String("overlayfs"),
-			// 	PathOnHost:   fcSdk.String(overlay),
-			// 	IsRootDevice: fcSdk.Bool(false),
-			// 	IsReadOnly:   fcSdk.Bool(false),
-			// },
 		},
 		MachineCfg: models.MachineConfiguration{
 			VcpuCount:  fcSdk.Int64(2),
@@ -123,4 +130,22 @@ func openTap(meta utils.VMMetaData) error {
 		return fmt.Errorf("failed to set tap device %s up and attach to bridge: %w", tap, err)
 	}
 	return nil
+}
+
+func SetupOverlayWithNetplan(vmId string) (string, error) {
+	overlayDir := filepath.Join(c.TMP, vmId)
+	overlayPath := filepath.Join(overlayDir, "overlay.ext4")
+	if err := os.MkdirAll(overlayDir, 0755); err != nil {
+		return "", err
+	}
+
+	// dd if=/dev/zero of=$OVERLAY_FN conv=sparse bs=1M count=1024
+	if err := exec.Command("dd", "if=/dev/zero", "of="+overlayPath, "conv=sparse", "bs=1M", "count=1024").Run(); err != nil {
+		return "", fmt.Errorf("failed to create overlay file: %w", err)
+	}
+	if err := exec.Command("mkfs.ext4", overlayPath).Run(); err != nil {
+		return "", fmt.Errorf("failed to create ext4 filesystem: %w", err)
+	}
+
+	return overlayPath, nil
 }

@@ -4,8 +4,10 @@ import (
 	"errors"
 	"fmt"
 	"manager/utils"
+	c "manager/utils/constants"
 	"os"
 	"os/exec"
+	"path/filepath"
 	"syscall"
 	"time"
 )
@@ -52,9 +54,9 @@ func (a *App) deleteOne(r utils.Record) error {
 	}
 
 	// 4) Unmount & cleanup overlay (if used) TODO! implement when we start using overlays
-	// if err := cleanupOverlay(r.ID); err != nil {
-	// 	merr = errors.Join(merr, fmt.Errorf("overlay: %w", err))
-	// }
+	if err := cleanOverlay(r.ID); err != nil {
+		merr = errors.Join(merr, fmt.Errorf("overlay: %w", err))
+	}
 
 	// if err := a.Records.Remove([]string{r.ID}); err != nil {
 	// 	return fmt.Errorf("failed to remove record: %w", err)
@@ -100,4 +102,12 @@ func killWithTimeout(pid int, grace time.Duration) error {
 		time.Sleep(100 * time.Millisecond)
 	}
 	return fmt.Errorf("pid %d did not exit", pid)
+}
+
+func cleanOverlay(vmId string) error {
+	overlayDir := filepath.Join(c.TMP, vmId)
+	if err := os.RemoveAll(overlayDir); err != nil {
+		return fmt.Errorf("failed to remove overlay directory: %w", err)
+	}
+	return nil
 }
