@@ -24,6 +24,39 @@ type Record struct {
 	PID int    `json:"pid"`
 }
 
+type Status string
+
+const (
+	StatusNoPID   Status = "NOPID"
+	StatusDead    Status = "DEAD"
+	StatusReady   Status = "READY"
+	StatusRunning Status = "RUNNING"
+)
+
+func (r *Record) Status() Status {
+	switch {
+	case r.PID <= 0:
+		return StatusNoPID
+	case func() bool {
+		err := syscall.Kill(r.PID, 0)
+		return !(err == nil || err == syscall.EPERM)
+	}():
+		return StatusDead
+	case func() bool {
+		const timeout = 200 * time.Millisecond
+		conn, err := net.DialTimeout("unix", VMMetaData(r.ID).SocketPth(), timeout)
+		if err != nil {
+			return false
+		}
+		_ = conn.Close()
+		return true
+	}():
+		return StatusReady
+	default:
+		return StatusRunning
+	}
+}
+
 // Handles management of micro-vm records stored to disk
 type RecordKeeper struct {
 	filePath string
@@ -190,37 +223,4 @@ func (rk *RecordKeeper) Get(ids []string) ([]Record, error) {
 		}
 	}
 	return out, nil
-}
-
-type Status string
-
-const (
-	StatusNoPID   Status = "NOPID"
-	StatusDead    Status = "DEAD"
-	StatusReady   Status = "READY"
-	StatusRunning Status = "RUNNING"
-)
-
-func (r *Record) Status() Status {
-	switch {
-	case r.PID <= 0:
-		return StatusNoPID
-	case func() bool {
-		err := syscall.Kill(r.PID, 0)
-		return !(err == nil || err == syscall.EPERM)
-	}():
-		return StatusDead
-	case func() bool {
-		const timeout = 200 * time.Millisecond
-		conn, err := net.DialTimeout("unix", VMMetaData(r.ID).SocketPth(), timeout)
-		if err != nil {
-			return false
-		}
-		_ = conn.Close()
-		return true
-	}():
-		return StatusReady
-	default:
-		return StatusRunning
-	}
 }
