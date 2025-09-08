@@ -88,9 +88,6 @@ func (a *App) Launch() error {
 	ctx := context.Background()
 	cmd := fcSdk.VMCommandBuilder{}.
 		WithSocketPath(meta.SocketPth()).
-		WithStdout(os.Stdout).
-		WithStderr(os.Stderr).
-		WithStdin(os.Stdin).
 		Build(ctx)
 	// cmd := fcSdk.VMCommandBuilder{}.WithSocketPath(meta.SocketPth()).Build(ctx)
 

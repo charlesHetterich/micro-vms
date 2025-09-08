@@ -14,6 +14,7 @@ func header() string {
 	for i := 0; i < rt.NumField(); i++ {
 		headers[i] = rt.Field(i).Name
 	}
+	headers = append(headers, "STATUS")
 	return strings.Join(headers, "\t")
 }
 
@@ -29,7 +30,7 @@ func (a *App) List(ids []string) error {
 		if r.PID > 0 {
 			pid = strconv.Itoa(r.PID)
 		}
-		fmt.Printf("%s\t%s\n", r.ID, pid)
+		fmt.Printf("%s\t%s\t%s\n", r.ID, pid, r.Status())
 	}
 	return nil
 }
