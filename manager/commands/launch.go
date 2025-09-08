@@ -17,35 +17,32 @@ import (
 )
 
 func (a *App) Launch() error {
-	// 1] Add record (no PID)
+	// Create record
 	id, err := a.Records.Add(-1)
 	if err != nil {
-		return fmt.Errorf("`launch` command failed: %v", err)
+		return err
 	}
 	meta := utils.VMMetaData(id)
-	if err := openTap(meta); err != nil {
+
+	// Networking
+	if err := openTap(meta.TapName()); err != nil {
 		fmt.Fprintf(os.Stderr, "Failed to open tap device: %v\n", err)
 		return err
 	}
-	fmt.Printf("VM IP: %s\n", meta.IP())
-	ip := net.ParseIP(meta.IP()) // e.g. "172.30.0.7"
+	ip := net.ParseIP(meta.IP())
 	mask := net.CIDRMask(24, 32)
 
-	// _, guestNet, _ := net.ParseCIDR(meta.IP() + "/24")
-	fmt.Printf("VM IP: %s\n", net.IPNet{IP: ip, Mask: mask})
-
-	overlay, err := SetupOverlayWithNetplan(id)
+	// FileSystem overlay
+	overlay, err := setupOverlay(id)
 	if err != nil {
 		return err
 	}
 
+	// Machine configuration
 	cfg := fcSdk.Config{
 		SocketPath:      meta.SocketPth(),
 		KernelImagePath: c.KERNEL_IMAGE,
 		KernelArgs:      "console=ttyS0 reboot=k panic=1 pci=off root=/dev/vda ro overlay_root=vdb init=/sbin/overlay-init overlay_id=" + id,
-		// KernelArgs: "console=ttyS0 reboot=k panic=1 pci=off overlay_root=ram init=/sbin/init overlay_id=" + id,
-		// KernelArgs: "console=ttyS0 reboot=k panic=1 pci=off init=/sbin/init",
-		// KernelArgs: "console=ttyS0 reboot=k panic=1 pci=off root=/dev/vda rw init=/sbin/init",
 		Drives: []models.Drive{
 			{
 				DriveID:      fcSdk.String("rootfs"),
@@ -83,14 +80,13 @@ func (a *App) Launch() error {
 		MetricsPath: c.BIN + "/firecracker.metrics",
 	}
 
+	// Create & launch machine
 	logger := logrus.New()
 	entry := logrus.NewEntry(logger)
 	ctx := context.Background()
 	cmd := fcSdk.VMCommandBuilder{}.
 		WithSocketPath(meta.SocketPth()).
 		Build(ctx)
-	// cmd := fcSdk.VMCommandBuilder{}.WithSocketPath(meta.SocketPth()).Build(ctx)
-
 	machine, err := fcSdk.NewMachine(
 		ctx, cfg,
 		fcSdk.WithLogger(entry),
@@ -102,12 +98,12 @@ func (a *App) Launch() error {
 	if err := machine.Start(ctx); err != nil {
 		panic(err)
 	}
-	// pid, _ := machine.PID()
+
+	// Capture & save PID
 	pid, err := machine.PID()
 	if err != nil {
 		return fmt.Errorf("get PID: %w", err)
 	}
-
 	if err := a.Records.Update(id, pid); err != nil {
 		return fmt.Errorf("record PID: %w", err)
 	}
@@ -115,9 +111,8 @@ func (a *App) Launch() error {
 	return nil
 }
 
-func openTap(meta utils.VMMetaData) error {
-	// tap := vmIDs.GetTapName(id)
-	tap := meta.TapName()
+// Creates network tap & attaches to `lmbr0` bridge
+func openTap(tap string) error {
 	cmd := exec.Command("ip", "tuntap", "add", tap, "mode", "tap")
 	if err := cmd.Run(); err != nil {
 		return fmt.Errorf("failed to create tap device %s: %w", tap, err)
@@ -129,14 +124,13 @@ func openTap(meta utils.VMMetaData) error {
 	return nil
 }
 
-func SetupOverlayWithNetplan(vmId string) (string, error) {
+// Creates .ext4 overlay filesystem for new `vmId`
+func setupOverlay(vmId string) (string, error) {
 	overlayDir := filepath.Join(c.TMP, vmId)
 	overlayPath := filepath.Join(overlayDir, "overlay.ext4")
 	if err := os.MkdirAll(overlayDir, 0755); err != nil {
 		return "", err
 	}
-
-	// dd if=/dev/zero of=$OVERLAY_FN conv=sparse bs=1M count=1024
 	if err := exec.Command("dd", "if=/dev/zero", "of="+overlayPath, "conv=sparse", "bs=1M", "count=1024").Run(); err != nil {
 		return "", fmt.Errorf("failed to create overlay file: %w", err)
 	}
