@@ -20,7 +20,10 @@ func main() {
 	cmd := os.Args[1]
 	switch cmd {
 	case "launch":
-		app.Launch()
+		if err := app.Launch(os.Args[2:]); err != nil {
+			fmt.Println("Error:", err)
+			os.Exit(1)
+		}
 	case "connect":
 		if len(os.Args) != 3 {
 			fmt.Println("Usage: ./manager connect <id>")

@@ -8,6 +8,8 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"strconv"
+	"sync"
 
 	c "manager/utils/constants"
 
@@ -16,7 +18,35 @@ import (
 	"github.com/sirupsen/logrus"
 )
 
-func (a *App) Launch() error {
+func (a *App) Launch(args []string) error {
+	if len(args) == 0 {
+		args = append(args, "1")
+	}
+	n, err := strconv.Atoi(args[0])
+	if err != nil {
+		return fmt.Errorf("invalid number of VMs to launch: %s", args[0])
+	}
+
+	var wg sync.WaitGroup
+	var merr error
+	var mu sync.Mutex
+	for i := uint8(0); i < uint8(n); i++ {
+		wg.Add(1)
+		go func() {
+			defer wg.Done()
+			if err := a.launchOne(); err != nil {
+				mu.Lock()
+				merr = fmt.Errorf("launch VM: %w", err)
+				mu.Unlock()
+			}
+		}()
+	}
+	wg.Wait()
+	return merr
+}
+
+func (a *App) launchOne() error {
+
 	// Create record
 	id, err := a.Records.Add(-1)
 	if err != nil {
