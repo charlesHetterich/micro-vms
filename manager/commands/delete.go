@@ -20,7 +20,7 @@ func (a *App) Delete(ids []string) error {
 
 	var merr error
 	for _, r := range records {
-		if err := a.deleteOne(r); err != nil {
+		if err := a.deleteResources(r); err != nil {
 			merr = errors.Join(merr, fmt.Errorf("%s: %w", r.ID, err))
 			continue
 		}
@@ -32,23 +32,26 @@ func (a *App) Delete(ids []string) error {
 	return merr
 }
 
-func (a *App) deleteOne(r utils.Record) error {
+// Clean up resources associated with a VM
+//   - process
+//   - tap device
+//   - socket file
+//   - overlay filesystem
+func (a *App) deleteResources(r utils.Record) error {
 	meta := utils.VMMetaData(r.ID)
 	var merr error
 
+	// Kill process
 	if r.PID > 0 && processAlive(r.PID) {
 		if err := killWithTimeout(r.PID, 3*time.Second); err != nil {
 			merr = errors.Join(merr, fmt.Errorf("kill pid %d: %w", r.PID, err))
 		}
 	}
 
-	// 2) Remove socket
+	// Delete socket & tap
 	if err := os.Remove(meta.SocketPth()); err != nil && !os.IsNotExist(err) {
 		merr = errors.Join(merr, fmt.Errorf("remove socket: %w", err))
-
 	}
-
-	// 3) Delete TAP device
 	if err := delTap(meta.TapName()); err != nil {
 		merr = errors.Join(merr, fmt.Errorf("del tap: %w", err))
 	}
@@ -57,11 +60,6 @@ func (a *App) deleteOne(r utils.Record) error {
 	if err := cleanOverlay(r.ID); err != nil {
 		merr = errors.Join(merr, fmt.Errorf("overlay: %w", err))
 	}
-
-	// if err := a.Records.Remove([]string{r.ID}); err != nil {
-	// 	return fmt.Errorf("failed to remove record: %w", err)
-	// }
-	// return nil
 	return merr
 
 }
