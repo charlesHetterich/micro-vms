@@ -6,6 +6,7 @@ import (
 	"manager/utils"
 	c "manager/utils/constants"
 	"os"
+	"os/exec"
 	// fcSdk "github.com/firecracker-microvm/firecracker-go-sdk"
 )
 
@@ -30,6 +31,18 @@ func main() {
 			os.Exit(1)
 		}
 		if err := app.Connect(os.Args[2]); err != nil {
+			fmt.Println("Error:", err)
+			os.Exit(1)
+		}
+	case "cmd":
+		if len(os.Args) < 4 {
+			fmt.Println("Usage: ./manager cmd <id> <command ...>")
+			os.Exit(1)
+		}
+		if err := app.Cmd(os.Args[2], os.Args[3:]); err != nil {
+			if ee, ok := err.(*exec.ExitError); ok {
+				os.Exit(ee.ExitCode())
+			}
 			fmt.Println("Error:", err)
 			os.Exit(1)
 		}
