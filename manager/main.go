@@ -1,5 +1,26 @@
 package main
 
+/*
+TODO #1
+- create `socket setup` go script which runs on vm
+    - such that it is part of this project but is compilable separately from main (main doesn't compile it, it doesn't compile main. but they may share some of the other stuff)
+- compile it to a binary
+- make that binary available in cli tool (single overall binary)
+- feed that binary into microvm base image on `init`
+- cmd over socket from host (should speed up cmd execution)
+
+TODO #2
+- shortcut for cmd: `vm <id> <command ...>`
+- normal is `vm cmd <id> <command ...>`
+
+TODO #3
+- snapshotting
+- fast launch from snapshot (i.e. have a "zero" snapshot on `init`, and all launches are from that snapshot)
+
+TODO #4
+- analyze memory usage & see if any ways to reduce it
+*/
+
 import (
 	"fmt"
 	"manager/commands"
@@ -7,7 +28,7 @@ import (
 	c "manager/utils/constants"
 	"os"
 	"os/exec"
-	// fcSdk "github.com/firecracker-microvm/firecracker-go-sdk"
+	"strconv"
 )
 
 func main() {
@@ -17,6 +38,22 @@ func main() {
 	}
 
 	app := commands.NewApp(utils.NewRecordKeeper(c.TMP + "/records.json"))
+
+	// Shorthand: `vm <id> <command ...>` -> `vm cmd <id> <command ...>`
+	if _, err := strconv.Atoi(os.Args[1]); err == nil {
+		if len(os.Args) < 3 {
+			fmt.Println("Usage: ./manager <id> <command ...>")
+			os.Exit(1)
+		}
+		if err := app.Cmd(os.Args[1], os.Args[2:]); err != nil {
+			if ee, ok := err.(*exec.ExitError); ok {
+				os.Exit(ee.ExitCode())
+			}
+			fmt.Println("Error:", err)
+			os.Exit(1)
+		}
+		return
+	}
 
 	cmd := os.Args[1]
 	switch cmd {
@@ -40,6 +77,18 @@ func main() {
 			os.Exit(1)
 		}
 		if err := app.Cmd(os.Args[2], os.Args[3:]); err != nil {
+			if ee, ok := err.(*exec.ExitError); ok {
+				os.Exit(ee.ExitCode())
+			}
+			fmt.Println("Error:", err)
+			os.Exit(1)
+		}
+	case "cmd0":
+		if len(os.Args) < 4 {
+			fmt.Println("Usage: ./manager cmd0 <id> <command ...>")
+			os.Exit(1)
+		}
+		if err := app.Cmd0(os.Args[2], os.Args[3:]); err != nil {
 			if ee, ok := err.(*exec.ExitError); ok {
 				os.Exit(ee.ExitCode())
 			}

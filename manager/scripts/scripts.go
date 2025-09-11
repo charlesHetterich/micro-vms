@@ -8,6 +8,9 @@ import (
 	"os/exec"
 )
 
+//go:embed bin/guest-go-init.amd64
+var GuestExecd []byte
+
 //go:embed connect.sh
 var connectSh []byte
 

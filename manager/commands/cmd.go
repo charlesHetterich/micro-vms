@@ -1,58 +1,83 @@
+// commands/cmd.go
 package commands
 
 import (
 	"fmt"
+	"io"
 	"manager/utils"
+	c "manager/utils/constants"
 	"os"
-	"os/exec"
-	"path/filepath"
+	"strings"
+	"syscall"
+	"time"
+
+	sdkvsock "github.com/firecracker-microvm/firecracker-go-sdk/vsock"
 )
 
-// // shellQuote single-quotes one arg for a POSIX shell.
-// func shellQuote(s string) string {
-// 	// close ', insert '\'' , reopen '
-// 	return "'" + strings.ReplaceAll(s, "'", `'"'"'`) + "'"
-// }
+func padID(id string) string {
+	if len(id) < 3 {
+		return fmt.Sprintf("%03s", id)
+	}
+	return id
+}
 
-// // buildRemoteCmd builds the command line to run under `sh -lc` on the guest.
-// // If the user supplied ONE arg, we treat it as an already-quoted shell command
-// // (so things like &&, |, redirections work when the user quotes it in their shell).
-// // If multiple args were provided, we shell-quote each token to preserve spacing.
-// func buildRemoteCmd(args []string) string {
-// 	if len(args) == 1 {
-// 		return args[0]
-// 	}
-// 	qs := make([]string, len(args))
-// 	for i, a := range args {
-// 		qs[i] = shellQuote(a)
-// 	}
-// 	return strings.Join(qs, " ")
-// }
+func tryCloseWrite(conn io.ReadWriteCloser) {
+	// Prefer UnixConn.CloseWrite if available.
+	type closeWriter interface{ CloseWrite() error }
+	if cw, ok := conn.(closeWriter); ok {
+		_ = cw.CloseWrite()
+		return
+	}
+	// Fallback: shutdown(SHUT_WR)
+	type syscaller interface {
+		SyscallConn() (syscall.RawConn, error)
+	}
+	if sc, ok := conn.(syscaller); ok {
+		if rc, err := sc.SyscallConn(); err == nil {
+			_ = rc.Control(func(fd uintptr) { _ = syscall.Shutdown(int(fd), syscall.SHUT_WR) })
+		}
+	}
+}
 
 func (a *App) Cmd(id string, argv []string) error {
+	id = padID(id)
 	if len(argv) == 0 {
 		return fmt.Errorf("usage: manager cmd <id> <command ...>")
 	}
+	meta := utils.VMMetaData(id)
+	uds := meta.VsockUDS()
+	port := uint32(c.VM_SOCKET_PORT)
 
-	ip := utils.VMMetaData(id).IP()
-	key := filepath.Join(os.Getenv("HOME"), ".ssh", "id_ed25519")
-
-	sshArgs := []string{
-		"-o", "StrictHostKeyChecking=no",
-		"-o", "UserKnownHostsFile=/dev/null", // avoids the “Permanently added …” line
-		"-o", "GlobalKnownHostsFile=/dev/null", // ditto
-		"-o", "BatchMode=yes",
-		"-o", "ConnectTimeout=3",
-		"-i", key,
-		"root@" + ip,
+	// Be a little more patient than the default 100ms so we don’t race immediately after launch.
+	conn, err := sdkvsock.Dial(uds, port,
+		sdkvsock.WithRetryTimeout(2*time.Second),
+		sdkvsock.WithRetryInterval(50*time.Millisecond),
+	)
+	if err != nil {
+		return fmt.Errorf("dial vsock (uds=%s, port=%d): %w", uds, port, err)
 	}
-	// Pass the command *as tokens*; ssh will quote/escape for the remote shell.
-	sshArgs = append(sshArgs, argv...)
+	defer conn.Close()
 
-	cmd := exec.Command("ssh", sshArgs...)
-	cmd.Stdin = os.Stdin
-	cmd.Stdout = os.Stdout
-	cmd.Stderr = os.Stderr
+	// Do we actually have stdin to send? (pipe/file vs TTY)
+	fi, _ := os.Stdin.Stat()
+	hasIn := fi != nil && (fi.Mode()&os.ModeCharDevice) == 0
 
-	return cmd.Run() // main.go will map *exec.ExitError to exit code
+	// Send 1-line header + command
+	header := "STDIN 0 "
+	if hasIn {
+		header = "STDIN 1 "
+	}
+	if _, err := io.WriteString(conn, header+strings.Join(argv, " ")+"\n"); err != nil {
+		return err
+	}
+
+	// If stdin is piped, stream it then half-close the write side.
+	if hasIn {
+		_, _ = io.Copy(conn, os.Stdin)
+		tryCloseWrite(conn)
+	}
+
+	// Read all remote output until the guest closes the connection.
+	_, _ = io.Copy(os.Stdout, conn)
+	return nil
 }

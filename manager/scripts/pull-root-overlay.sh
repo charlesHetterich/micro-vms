@@ -4,11 +4,14 @@ BIN=$HOME/.micro-vm/bin
 TMP=/tmp/micro-vms
 ROOTFS_MOUNT=$TMP/rootfs-base
 OVERLAY_INIT=/root/micro-vms/manager/scripts/overlay-init # TODO! embed this into Go binary
+GUEST_INIT_BINARY=/root/micro-vms/manager/scripts/bin/guest-go-init.amd64 # TODO! embed this into Go binary
 
 rm -rf $BIN
 mkdir -p $BIN
 mkdir -p $ROOTFS_MOUNT
 
+# TODO! This currently requires a github PAT. Install something 
+#       else or different route which requires no such credentials
 skopeo copy docker://ghcr.io/liquidmetal-dev/firecracker-kernel:6.1 oci:$BIN/kernel:latest
 skopeo copy docker://ghcr.io/liquidmetal-dev/ubuntu:22.04 oci:$BIN/rootfs:latest
 
@@ -31,6 +34,10 @@ sudo chown -R root:root $ROOTFS_MOUNT/root/.ssh
 # Copy in overlay-init script
 sudo cp $OVERLAY_INIT $ROOTFS_MOUNT/sbin/overlay-init
 chmod +x $ROOTFS_MOUNT/sbin/overlay-init
+
+# Copy in guest-go-init binary
+sudo mkdir -p $ROOTFS_MOUNT/usr/local/bin
+sudo install -m 0755 $GUEST_INIT_BINARY $ROOTFS_MOUNT/usr/local/bin/guest-go-init
 
 cat <<EOF | sudo tee $ROOTFS_MOUNT/etc/netplan/01-netcfg.yaml
 network:

@@ -52,6 +52,9 @@ func (a *App) deleteResources(r utils.Record) error {
 	if err := os.Remove(meta.SocketPth()); err != nil && !os.IsNotExist(err) {
 		merr = errors.Join(merr, fmt.Errorf("remove socket: %w", err))
 	}
+	if err := os.Remove(meta.VsockUDS()); err != nil && !os.IsNotExist(err) {
+		merr = errors.Join(merr, fmt.Errorf("remove vsock uds: %w", err))
+	}
 	if err := delTap(meta.TapName()); err != nil {
 		merr = errors.Join(merr, fmt.Errorf("del tap: %w", err))
 	}

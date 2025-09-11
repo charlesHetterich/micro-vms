@@ -87,6 +87,13 @@ func (a *App) launchOne() error {
 				IsReadOnly:   fcSdk.Bool(false),
 			},
 		},
+		VsockDevices: []fcSdk.VsockDevice{
+			{
+				ID:   "vsock0",
+				Path: meta.VsockUDS(),
+				CID:  meta.CID(),
+			},
+		},
 		MachineCfg: models.MachineConfiguration{
 			VcpuCount:  fcSdk.Int64(2),
 			MemSizeMib: fcSdk.Int64(256),
